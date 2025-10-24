@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex overflow-auto mb-4 border rounded p-2 align-items-center">
+    <div class="text-center me-3">
+        <a href="{% url 'shop1:create_story' %}" class="text-decoration-none text-dark">
+            <div class="story-ring bg-light d-flex justify-content-center align-items-center" style="width: 66px; height: 66px;">
+                <i class="bi bi-plus-circle" style="font-size: 32px;"></i>
+            </div>
+            <small>استوری شما</small>
+        </a>
+    </div>
+
+    {% for story in stories %}
+    <div class="text-center me-3">
+        <a href="{% url 'shop1:view_story' story.id %}" class="text-decoration-none text-dark">
+            <div class="story-ring">
+                {% if story.user.profile and story.user.profile.image %}
+                    <img src="{{ story.user.profile.image.url }}" class="story-thumbnail">
+                {% else %}
+                    <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons/icons/person-circle.svg" class="story-thumbnail">
+                {% endif %}
+            </div>
+            <small>{{ story.user.username }}</small>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+{% for post in posts %}
+<div class="post-card">
+    <div class="post-header p-3">
+        <a href="{% url 'shop1:public_profile' post.user.username %}" class="text-decoration-none text-dark fw-bold d-flex align-items-center">
+            {% if post.user.profile and post.user.profile.image %}
+                <img src="{{ post.user.profile.image.url }}">
+            {% else %}
+                <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons/icons/person-circle.svg">
+            {% endif %}
+            <span>{{ post.user.username }}</span>
+        </a>
+    </div>
+
+    {% if post.media.all %}
+    <div id="carousel-{{ post.id }}" class="carousel slide" data-bs-touch="true" data-bs-interval="false">
+        
+        {% if post.media.count > 1 %}
+        <div class="carousel-indicators">
+            {% for media in post.media.all %}
+            <button type="button" data-bs-target="#carousel-{{ post.id }}" data-bs-slide-to="{{ forloop.counter0 }}" class="{% if forloop.first %}active{% endif %}" aria-current="true"></button>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="carousel-inner">
+            {% for media in post.media.all %}
+            <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                {% if media.is_video %}
+                    <video class="d-block w-100" controls>
+                        <source src="{{ media.file.url }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                {% else %}
+                    <img src="{{ media.file.url }}" class="d-block w-100" alt="Post media">
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        
+    </div>
+    {% endif %}
+
+<div class="post-actions p-2 d-flex align-items-center">
+    <button type="button" class="btn text-dark like-btn" data-post-id="{{ post.pk }}" data-like-url="{% url 'shop1:like_post' post.pk %}">
+        <i class="bi {% if user in post.likes.all %}bi-heart-fill text-danger{% else %}bi-heart{% endif %}"></i>
+    </button>
+    <span class="fw-bold me-2" id="like-count-{{ post.pk }}">{{ post.total_likes }}</span>
+    
+    <a href="{% url 'shop1:post_detail' post.pk %}" class="btn text-dark"><i class="bi bi-chat"></i></a>
+    
+    <a href="{% url 'shop1:share_post' post.pk %}" class="btn text-dark"><i class="bi bi-send"></i></a>
+</div>
+    <div class="px-3 pb-2">
+        <div class="caption-container">
+            <a href="{% url 'shop1:public_profile' post.user.username %}" class="text-decoration-none text-dark fw-bold">{{ post.user.username }}</a>
+            
+            <span class="caption-content" style="display: inline;">
+                <span class="full-caption" style="display: none;">{{ post.desc|linebreaksbr }}</span>
+                
+                {% if post.desc|length > 80 %}
+                    <span class="short-caption">{{ post.desc|truncatechars_html:80|linebreaksbr }}</span>
+                    <span class="more-link" style="cursor: pointer; color: var(--secondary-text-color);">بیشتر</span>
+                {% else %}
+                    <span class="short-caption">{{ post.desc|linebreaksbr }}</span>
+                {% endif %}
+            </span>
+        </div>
+    </div>
+    {% if post.comments.count > 0 %}
+    <div class="px-3 pb-3">
+        <a href="{% url 'shop1:post_detail' post.pk %}" class="text-decoration-none" style="color: var(--secondary-text-color);">
+            مشاهده همه {{ post.comments.count }} کامنت
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% empty %}
+    <p class="text-center text-muted mt-5">هیچ پستی برای نمایش وجود ندارد.</p>
+{% endfor %}
+{% endblock content %}
+
+{% block page_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+
+        // --- START: اسکریپت ساده‌شده برای نمایش کپشن ---
+        document.querySelectorAll('.more-link').forEach(link => {
+            link.addEventListener('click', function() {
+                const container = this.closest('.caption-content');
+                const shortCaption = container.querySelector('.short-caption');
+                const fullCaption = container.querySelector('.full-caption');
+
+                if (shortCaption && fullCaption) {
+                    shortCaption.style.display = 'none'; // مخفی کردن متن کوتاه
+                    fullCaption.style.display = 'inline'; // نمایش متن کامل
+                    this.style.display = 'none'; // مخفی کردن لینک "بیشتر"
+                }
+            });
+        });
+        // --- END: اسکریپت ساده‌شده ---
+
+        // --- اسکریپت برای لایک با AJAX ---
+        document.querySelectorAll('.like-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const postId = this.dataset.postId;
+                const url = this.dataset.likeUrl;
+                const likeIcon = this.querySelector('i');
+                const likeCountSpan = document.getElementById(`like-count-${postId}`);
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    likeCountSpan.textContent = data.total_likes;
+                    if (data.user_liked) {
+                        likeIcon.classList.remove('bi-heart');
+                        likeIcon.classList.add('bi-heart-fill', 'text-danger');
+                    } else {
+                        likeIcon.classList.remove('bi-heart-fill', 'text-danger');
+                        likeIcon.classList.add('bi-heart');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            });
+        });
+        
+        // --- اسکریپت برای کشیدن اسلایدر ---
+        document.querySelectorAll('.carousel').forEach(carouselEl => {
+            const carouselInstance = new bootstrap.Carousel(carouselEl);
+            let startX = 0;
+            let isDragging = false;
+
+            const handleDragStart = (e) => {
+                isDragging = true;
+                startX = e.touches ? e.touches[0].pageX : e.pageX;
+            };
+
+            const handleDragEnd = (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                const endX = e.changedTouches ? e.changedTouches[0].pageX : e.pageX;
+                const diffX = startX - endX;
+
+                if (Math.abs(diffX) > 50) {
+                    if (diffX > 0) {
+                        carouselInstance.next();
+                    } else {
+                        carouselInstance.prev();
+                    }
+                }
+            };
+
+            carouselEl.addEventListener('touchstart', handleDragStart);
+            carouselEl.addEventListener('touchend', handleDragEnd);
+            carouselEl.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                handleDragStart(e);
+            });
+            carouselEl.addEventListener('mouseup', handleDragEnd);
+            carouselEl.addEventListener('mouseleave', () => {
+                isDragging = false;
+            });
+        });
+
+    });
+</script>
+{% endblock page_scripts %}

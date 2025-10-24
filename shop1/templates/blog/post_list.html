@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}لیست پست‌ها{% endblock %}
+
+{% block content %}
+<h1>پست‌های منتشر شده</h1>
+
+{% for post in posts %}
+    <div style="border-bottom: 1px solid #ccc; padding: 10px 0;">
+        {% if post.image %}
+            <img src="{{ post.image.url }}" alt="{{ post.title }}" width="150" style="float:right; margin-left:10px;">
+        {% endif %}
+        <h3>
+            <a href="{% url 'shop1:post_detail' pk=post.pk %}">{{ post.title }}</a>
+        </h3>
+        <p>{{ post.desc|truncatewords:20 }}</p>
+        <small>منتشر شده در: {{ post.publish|date:"Y/m/d H:i" }} توسط {{ post.author }}</small>
+    </div>
+{% empty %}
+    <p>هیچ پستی منتشر نشده است.</p>
+{% endfor %}
+{% endblock %}

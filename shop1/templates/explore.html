@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block title %}اکسپلور{% endblock %}
+
+{% block content %}
+<style>
+    /* استایل اصلی کانتینر اکسپلور */
+    .explore-container {
+        max-width: 935px; /* عرض استاندارد اینستاگرام */
+        margin: auto;
+    }
+
+    /* طرح‌بندی آجری با استفاده از CSS Columns */
+    .masonry-grid {
+        column-count: 3; /* تعداد ستون‌ها */
+        column-gap: 1.5rem; /* فاصله بین ستون‌ها */
+        width: 100%;
+    }
+
+    .masonry-item {
+        display: inline-block;
+        width: 100%;
+        margin-bottom: 1.5rem;
+        position: relative;
+        overflow: hidden;
+        border-radius: 12px; /* گوشه‌های گرد برای زیبایی */
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1); /* سایه ملایم */
+    }
+
+    .masonry-item img {
+        width: 100%;
+        height: auto;
+        display: block;
+        transition: transform 0.4s ease;
+    }
+
+    /* افکت زوم هنگام هاور */
+    .masonry-item:hover img {
+        transform: scale(1.05);
+    }
+
+    /* لایه overlay برای نمایش اطلاعات لایک و کامنت */
+    .post-info-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.4);
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        pointer-events: none; /* اجازه می‌دهد کلیک به لینک زیرین منتقل شود */
+    }
+    
+    .masonry-item a:hover .post-info-overlay {
+        opacity: 1;
+    }
+
+    .post-info-overlay span {
+        font-size: 1rem;
+        font-weight: bold;
+    }
+    
+    /* آیکون ویدیو */
+    .video-icon {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        color: white;
+        font-size: 1.5rem;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    /* واکنش‌گرایی برای موبایل */
+    @media (max-width: 768px) {
+        .masonry-grid {
+            column-count: 2;
+            column-gap: 1rem;
+        }
+        .masonry-item {
+            margin-bottom: 1rem;
+        }
+    }
+</style>
+
+<div class="explore-container">
+    <h2 class="mb-4 fw-light">اکسپلور 🧭</h2>
+    <div class="masonry-grid">
+        {% for post in posts %}
+        <div class="masonry-item">
+            <a href="{% url 'shop1:post_detail' post.pk %}">
+                {% with post.media.first as first_media %}
+                    {% if first_media %}
+                        <img src="{{ first_media.file.url }}" alt="{{ post.title }}">
+                        
+                        {% if first_media.is_video %}
+                            <i class="bi bi-play-btn-fill video-icon"></i>
+                        {% endif %}
+
+                        <div class="post-info-overlay">
+                            <span><i class="bi bi-heart-fill"></i> {{ post.likes.count }}</span>
+                            <span class="ms-3"><i class="bi bi-chat-fill"></i> {{ post.comments.count }}</span>
+                        </div>
+                    {% endif %}
+                {% endwith %}
+            </a>
+        </div>
+        {% empty %}
+        <p class="text-center w-100 text-muted">پستی برای نمایش در اکسپلور وجود ندارد.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

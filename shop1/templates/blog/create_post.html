@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}ایجاد پست جدید{% endblock %}
+
+{% block content %}
+<div class="post-card p-4">
+    <h2 class="mb-4">ایجاد پست جدید</h2>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-danger">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="title" class="form-label">عنوان (اختیاری):</label>
+            <input type="text" name="title" id="title" class="form-control">
+        </div>
+
+        <div class="mb-3">
+            <label for="desc" class="form-label">توضیحات (کپشن):</label>
+            <textarea name="desc" id="desc" rows="5" class="form-control" required></textarea>
+        </div>
+
+        <div class="mb-3">
+            <label for="files" class="form-label">عکس‌ها یا ویدیوها:</label>
+            <input type="file" name="files" id="files" class="form-control" accept="image/*,video/*" multiple required>
+        </div>
+
+        <div class="mb-3">
+            <label for="status" class="form-label">وضعیت:</label>
+            <select name="status" id="status" class="form-select">
+                <option value="published">منتشر شده</option>
+                <option value="draft">پیش‌نویس</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">اشتراک‌گذاری</button>
+    </form>
+</div>
+{% endblock %}

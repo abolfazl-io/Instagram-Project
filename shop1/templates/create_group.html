@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}چت جدید{% endblock %}
+
+{% block content %}
+<div class="post-card p-3">
+    <h4 class="mb-4 border-bottom pb-2">چت جدید</h4>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-danger">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="mb-3" id="group-name-container" style="display: none;">
+            <label for="group_name" class="form-label">نام گروه:</label>
+            <input type="text" name="group_name" id="group_name" class="form-control">
+        </div>
+        
+        <h5 class="mt-4">ارسال به:</h5>
+        <div style="max-height: 300px; overflow-y: auto;">
+        {% for user_item in followers %}
+            <div class="form-check mb-2">
+                <input class="form-check-input user-checkbox" type="checkbox" name="users" value="{{ user_item.id }}" id="user-{{ user_item.id }}">
+                <label class="form-check-label" for="user-{{ user_item.id }}">{{ user_item.username }}</label>
+            </div>
+        {% empty %}
+            <p class="text-muted">کسی شما را دنبال نمی‌کند تا چت را شروع کنید.</p>
+        {% endfor %}
+        </div>
+        
+        <button type="submit" id="submit-btn" class="btn btn-primary w-100 mt-3">شروع چت</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    const groupNameContainer = document.getElementById('group-name-container');
+    const groupNameInput = document.getElementById('group_name');
+    const submitBtn = document.getElementById('submit-btn');
+
+    function updateFormState() {
+        const checkedCount = document.querySelectorAll('.user-checkbox:checked').length;
+
+        if (checkedCount > 1) {
+            // حالت گروهی
+            groupNameContainer.style.display = 'block';
+            groupNameInput.required = true;
+            submitBtn.textContent = 'ایجاد گروه';
+        } else {
+            // حالت چت دو نفره
+            groupNameContainer.style.display = 'none';
+            groupNameInput.required = false;
+            submitBtn.textContent = 'شروع چت';
+        }
+    }
+
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateFormState);
+    });
+});
+</script>
+{% endblock %}

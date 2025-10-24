@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>نتایج جستجو برای "{{ query }}"</h2>
+
+<form method="get" action="{% url 'shop1:search_users' %}">
+    <input type="text" name="q" value="{{ query }}" placeholder="نام کاربری را جستجو کنید">
+    <button type="submit">جستجو</button>
+</form>
+
+{% if results %}
+    <ul>
+    {% for user in results %}
+        <li>
+            <a href="{% url 'shop1:public_profile' user.username %}">{{ user.username }}</a>
+        </li>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>هیچ کاربری پیدا نشد.</p>
+{% endif %}
+{% endblock %}

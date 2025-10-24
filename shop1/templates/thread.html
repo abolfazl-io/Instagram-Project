@@ -1,0 +1,447 @@
+{% extends 'base.html' %}
+{% block title %}چت{% endblock %}
+
+{% block content %}
+<div class="post-card">
+    <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
+        <div class="fw-bold text-dark" id="thread-header">
+            {% if is_group %}
+                {{ thread.name }}
+            {% elif other_user %}
+                <a href="{% url 'shop1:public_profile' other_user.username %}" class="text-decoration-none text-dark">
+                    {{ other_user.username }}
+                </a>
+            {% endif %}
+        </div>
+        <div id="typing-indicator" style="display: none;">
+            <small class="text-muted">در حال نوشتن...</small>
+        </div>
+    </div>
+
+    <div id="message-list-container" class="p-3" style="height: 60vh; overflow-y: auto;">
+        <div id="message-list">
+        {% for message in messages %}
+            <div class="message-wrapper d-flex {% if message.sender == request.user %}justify-content-end{% else %}justify-content-start{% endif %} mb-2 group-hover" data-message-id="{{ message.id }}">
+                {% if message.sender != request.user %}
+                <button class="btn btn-sm reply-message-btn me-2" data-message-id="{{ message.id }}" data-message-body="{{ message.body|default_if_none:''|truncatechars:20 }}" data-message-sender="{{ message.sender.username }}">
+                    <i class="bi bi-reply"></i>
+                </button>
+                {% endif %}
+                
+                <div class="message-bubble p-2 rounded {% if message.sender == request.user %}bg-primary text-white{% else %}bg-light{% endif %} {% if message.file and not message.body %}media-only{% endif %}" style="max-width: 70%;">
+                    {% if message.parent_message %}
+                        <div class="reply-snippet p-2 rounded mb-1" style="background-color: rgba(0,0,0,0.1);">
+                            <strong class="small">{{ message.parent_message.sender.username }}</strong>
+                            <p class="small text-muted mb-0">{{ message.parent_message.body|default_if_none:''|truncatechars:30 }}</p>
+                        </div>
+                    {% endif %}
+                    
+                    {% if message.is_view_once %}
+                        {% if message.sender == request.user %}
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-eye-slash me-2"></i>
+                                <span class="fst-italic">{% if message.is_video %}ویدیو{% else %}عکس{% endif %} یکبار مصرف ارسال شد</span>
+                            </div>
+                        {% elif user in message.viewed_by.all %}
+                            <span class="text-muted fst-italic">{% if message.is_video %}ویدیو دیده شد{% else %}عکس دیده شد{% endif %}</span>
+                        {% else %}
+                            <button class="btn btn-outline-secondary btn-sm view-once-btn" data-message-id="{{ message.id }}" data-file-url="{{ message.file.url }}" data-is-video="{{ message.is_video }}" data-duration="{{ message.view_once_duration|default_if_none:5 }}">
+                                <i class="bi bi-camera-reels" style="transform: rotate(20deg);"></i> {% if message.is_video %}مشاهده ویدیو{% else %}مشاهده عکس{% endif %}
+                            </button>
+                        {% endif %}
+                    {% else %}
+                        {% if message.shared_post %}
+                        <a href="{% url 'shop1:post_detail' message.shared_post.pk %}" class="text-decoration-none">
+                            <div class="shared-post-snippet p-2 rounded mb-1 border">
+                                {% if message.shared_post.media.first %}
+                                <img src="{{ message.shared_post.media.first.file.url }}" class="img-fluid rounded mb-2" />
+                                {% endif %}
+                                <strong class="small d-block {% if message.sender == request.user %}text-white-50{% else %}text-dark{% endif %}">پست از {{ message.shared_post.user.username }}</strong>
+                            </div>
+                        </a>
+                        {% endif %}
+
+                        {% if message.file %}
+                            {% if message.is_video %}
+                                <video src="{{ message.file.url }}" class="img-fluid rounded" controls style="max-height: 250px;"></video>
+                            {% else %}
+                                <img src="{{ message.file.url }}" class="img-fluid rounded" style="max-height: 250px;" />
+                            {% endif %}
+                        {% endif %}
+
+                        {% if message.body %}
+                            <span class="message-body">{{ message.body|linebreaksbr }}</span>
+                        {% endif %}
+                    {% endif %}
+
+                    {% if message.likes.count > 0 %}
+                    <div class="like-indicator">
+                        <i class="bi bi-heart-fill"></i>
+                    </div>
+                    {% endif %}
+                </div>
+                {% if message.sender == request.user %}
+                <button class="btn btn-sm reply-message-btn ms-2" data-message-id="{{ message.id }}" data-message-body="{{ message.body|default_if_none:''|truncatechars:20 }}" data-message-sender="{{ message.sender.username }}">
+                    <i class="bi bi-reply"></i>
+                </button>
+                {% endif %}
+            </div>
+            
+            {% if forloop.last and message.sender == request.user and other_user in message.seen_by.all %}
+                <div class="d-flex justify-content-end">
+                    <small class="text-muted seen-indicator">دیده شد</small>
+                </div>
+            {% endif %}
+
+        {% endfor %}
+        </div>
+    </div>
+    
+    <div class="p-3 border-top">
+        <div id="reply-preview" class="p-2 rounded mb-2 bg-light" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <strong class="small d-block">در حال پاسخ به <span id="reply-sender"></span></strong>
+                    <p class="small text-muted mb-0" id="reply-body"></p>
+                </div>
+                <button id="cancel-reply" class="btn-close btn-sm"></button>
+            </div>
+        </div>
+<div id="file-preview-container" class="mb-2" style="display: none;">
+    <div class="d-flex justify-content-between align-items-start p-2 border rounded">
+        <div>
+            <img id="file-preview-img" style="max-width: 60px; max-height: 60px; object-fit: cover;" class="rounded">
+            
+            {% if not is_group %}
+            <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" id="is-view-once-checkbox">
+                <label class="form-check-label small" for="is-view-once-checkbox">ارسال یکبار مصرف</label>
+            </div>
+            <div id="duration-selector" class="mt-2" style="display: none;">
+                <select class="form-select form-select-sm" id="view-once-duration">
+                    <option value="5">5 ثانیه</option>
+                    <option value="10">10 ثانیه</option>
+                    <option value="30">30 ثانیه</option>
+                </select>
+            </div>
+            {% endif %}
+
+        </div>
+        <button id="cancel-file-btn" class="btn-close btn-sm"></button>
+    </div>
+</div>
+
+        <form id="message-form">
+            <input type="file" id="file-input" style="display: none;" accept="image/*,video/*">
+            <input type="hidden" id="parent-message-id">
+            <div class="input-group">
+                <button id="attach-file-btn" class="btn btn-outline-secondary" type="button"><i class="bi bi-paperclip"></i></button>
+                <input type="text" id="message-input" class="form-control" placeholder="پیام خود را بنویسید..." autofocus>
+                <button class="btn btn-primary" type="submit">ارسال</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<style>
+    .message-bubble { position: relative; cursor: pointer; display: flex; flex-direction: column; }
+    .like-indicator { position: absolute; bottom: -8px; left: -8px; background-color: var(--card-bg-color); border: 1px solid var(--border-color); border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.2); animation: pop 0.3s ease-out; }
+    .justify-content-end .like-indicator { left: auto; right: -8px; }
+    .like-indicator i { color: red; }
+    @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }
+    .message-bubble.media-only { background-color: transparent !important; padding: 0 !important; border: none !important; overflow: hidden; }
+    .message-bubble.media-only img, .message-bubble.media-only video { border-radius: 18px !important; }
+    .message-bubble .message-body { word-wrap: break-word; overflow-wrap: break-word; }
+    .message-bubble img + .message-body, .message-bubble video + .message-body { margin-top: 8px; }
+    .disappearing { animation: dissolve 0.5s forwards; }
+    @keyframes dissolve { from { opacity: 1; filter: blur(0); } to { opacity: 0; filter: blur(5px); transform: scale(0.9); } }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const messageForm = document.getElementById('message-form');
+    const messageInput = document.getElementById('message-input');
+    const messageList = document.getElementById('message-list');
+    const messageContainer = document.getElementById('message-list-container');
+    const attachFileBtn = document.getElementById('attach-file-btn');
+    const fileInput = document.getElementById('file-input');
+    const filePreviewContainer = document.getElementById('file-preview-container');
+    const filePreviewImg = document.getElementById('file-preview-img');
+    const cancelFileBtn = document.getElementById('cancel-file-btn');
+    const isViewOnceCheckbox = document.getElementById('is-view-once-checkbox');
+    const durationSelector = document.getElementById('duration-selector');
+    const parentMessageIdInput = document.getElementById('parent-message-id');
+    const replyPreview = document.getElementById('reply-preview');
+    const replySender = document.getElementById('reply-sender');
+    const replyBody = document.getElementById('reply-body');
+    const cancelReplyBtn = document.getElementById('cancel-reply');
+    const currentUsername = "{{ user.username }}";
+    const threadId = "{{ thread.id }}";
+    const typingIndicator = document.getElementById('typing-indicator');
+    let typingTimer;
+    let selectedFile = null;
+
+    messageContainer.scrollTop = messageContainer.scrollHeight;
+
+    const chatSocket = new WebSocket('ws://' + window.location.host + '/ws/chat/' + threadId + '/');
+
+    chatSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'new_message') {
+            const messageData = data.message;
+            // فقط پیام‌هایی را اضافه کن که از طرف کاربر فعلی نیستند
+            // چون پیام‌های کاربر فعلی بلافاصله بعد از ارسال به صورت محلی اضافه می‌شوند
+            if (messageData.sender !== currentUsername) {
+                appendMessage(messageData);
+                messageContainer.scrollTop = messageContainer.scrollHeight;
+            }
+        } else if (data.type === 'like_update') {
+            updateLikeIndicator(data.update);
+        } else if (data.type === 'typing') {
+            if (data.sender !== currentUsername) {
+                typingIndicator.style.display = 'block';
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(() => { typingIndicator.style.display = 'none'; }, 3000);
+            }
+        }
+    };
+
+    if(isViewOnceCheckbox) {
+        isViewOnceCheckbox.addEventListener('change', function() {
+            durationSelector.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+    
+    attachFileBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            selectedFile = this.files[0];
+            filePreviewImg.src = URL.createObjectURL(selectedFile);
+            filePreviewContainer.style.display = 'block';
+        }
+    });
+
+    cancelFileBtn.addEventListener('click', function() {
+        selectedFile = null;
+        fileInput.value = '';
+        filePreviewContainer.style.display = 'none';
+        if(isViewOnceCheckbox) {
+            isViewOnceCheckbox.checked = false;
+        }
+        durationSelector.style.display = 'none';
+    });
+
+    messageForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const messageText = messageInput.value;
+        if (!selectedFile && messageText.trim() === '') return;
+
+        if (selectedFile) {
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('body', messageText);
+            if(isViewOnceCheckbox) {
+                formData.append('is_view_once', isViewOnceCheckbox.checked);
+                if (isViewOnceCheckbox.checked) {
+                    formData.append('duration', document.getElementById('view-once-duration').value);
+                }
+            }
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            fetch(`/inbox/thread/${threadId}/upload/`, { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest' }})
+                .then(response => response.json())
+                .then(data => { 
+                    if (data.status !== 'ok') {
+                        console.error('File upload failed');
+                    } else {
+                        // در صورت موفقیت، پیام را به صورت محلی اضافه می‌کنیم
+                        // سرور پیام را به بقیه ارسال خواهد کرد
+                        appendMessage({
+                            id: Date.now(), // ID موقت برای نمایش فوری
+                            sender: currentUsername, 
+                            body: messageText, 
+                            file_url: URL.createObjectURL(selectedFile),
+                            is_video: selectedFile.type.startsWith('video/'), 
+                            is_view_once: isViewOnceCheckbox ? isViewOnceCheckbox.checked : false,
+                            view_once_duration: isViewOnceCheckbox && isViewOnceCheckbox.checked ? document.getElementById('view-once-duration').value : null,
+                            is_reply: false, 
+                            parent: null, 
+                            likes_count: 0
+                        });
+                        messageContainer.scrollTop = messageContainer.scrollHeight;
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            
+            cancelFileBtn.click();
+
+        } else {
+            chatSocket.send(JSON.stringify({
+                'type': 'new_message', 
+                'message': messageText, 
+                'parent_message_id': parentMessageIdInput.value
+            }));
+            // پیام متنی را به صورت محلی اضافه می‌کنیم
+            appendMessage({
+                id: Date.now(), // ID موقت
+                sender: currentUsername, 
+                body: messageText, 
+                file_url: null, 
+                is_video: false, 
+                is_view_once: false,
+                is_reply: !!parentMessageIdInput.value, 
+                parent: parentMessageIdInput.value ? { sender: replySender.textContent, body: replyBody.textContent } : null,
+                likes_count: 0
+            });
+        }
+        
+        messageInput.value = '';
+        cancelReplyBtn.click();
+        messageContainer.scrollTop = messageContainer.scrollHeight;
+    });
+
+    messageInput.addEventListener('input', () => chatSocket.send(JSON.stringify({ 'type': 'typing' })));
+
+    function setupEventListeners() {
+        document.querySelectorAll('.reply-message-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                parentMessageIdInput.value = this.dataset.messageId;
+                replySender.textContent = this.dataset.messageSender;
+                replyBody.textContent = this.dataset.messageBody;
+                replyPreview.style.display = 'block';
+                messageInput.focus();
+            });
+        });
+
+        document.querySelectorAll('.message-bubble').forEach(messageBubble => {
+            messageBubble.addEventListener('dblclick', function() {
+                const messageId = this.closest('.message-wrapper').dataset.messageId;
+                if (!isNaN(messageId)) {
+                    chatSocket.send(JSON.stringify({ 'type': 'like_message', 'message_id': messageId }));
+                }
+            });
+        });
+
+        document.querySelectorAll('.view-once-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const messageId = this.dataset.messageId;
+                const fileUrl = this.dataset.fileUrl;
+                const isVideo = this.dataset.isVideo === 'true';
+                const duration = parseInt(this.dataset.duration || 5) * 1000;
+                const buttonParent = this.parentElement;
+
+                if (!isNaN(messageId)) {
+                    fetch(`/message/${messageId}/viewed/`, {
+                        method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                }
+
+                let mediaElement = document.createElement(isVideo ? 'video' : 'img');
+                mediaElement.src = fileUrl;
+                if (isVideo) { mediaElement.controls = true; mediaElement.autoplay = true; }
+                mediaElement.className = 'img-fluid rounded';
+                mediaElement.style.maxHeight = '250px';
+                
+                buttonParent.innerHTML = '';
+                buttonParent.appendChild(mediaElement);
+                buttonParent.classList.add('media-only');
+
+                setTimeout(() => {
+                    mediaElement.classList.add('disappearing');
+                    setTimeout(() => {
+                        const seenText = isVideo ? 'ویدیو دیده شد' : 'عکس دیده شد';
+                        buttonParent.innerHTML = `<span class="text-muted fst-italic">${seenText}</span>`;
+                        buttonParent.classList.remove('media-only');
+                    }, 500);
+                }, duration);
+            }, { once: true });
+        });
+    }
+    setupEventListeners();
+
+    cancelReplyBtn.addEventListener('click', function() {
+        parentMessageIdInput.value = '';
+        replyPreview.style.display = 'none';
+    });
+
+    function updateLikeIndicator(updateData) {
+        const messageWrapper = document.querySelector(`.message-wrapper[data-message-id='${updateData.message_id}']`);
+        if (!messageWrapper) return;
+        const messageBubble = messageWrapper.querySelector('.message-bubble');
+        let indicator = messageBubble.querySelector('.like-indicator');
+        if (updateData.likes_count > 0) {
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.className = 'like-indicator';
+                indicator.innerHTML = '<i class="bi bi-heart-fill"></i>';
+                messageBubble.appendChild(indicator);
+            }
+        } else {
+            if (indicator) indicator.remove();
+        }
+    }
+
+    function appendMessage(message) {
+        // جلوگیری از اضافه کردن پیام تکراری
+        if (document.querySelector(`[data-message-id='${message.id}']`)) return;
+
+        const isSender = message.sender === currentUsername;
+        let finalHTML = '';
+
+        if (message.is_view_once) {
+            let content;
+            if (isSender) {
+                content = `<div class="d-flex align-items-center"><i class="bi bi-eye-slash me-2"></i><span class="fst-italic">${message.is_video ? 'ویدیو' : 'عکس'} یکبار مصرف ارسال شد</span></div>`;
+            } else {
+                content = `<button class="btn btn-outline-secondary btn-sm view-once-btn" data-message-id="${message.id}" data-file-url="${message.file_url}" data-is-video="${message.is_video}" data-duration="${message.view_once_duration || 5}">
+                               <i class="bi bi-camera-reels" style="transform: rotate(20deg);"></i> ${message.is_video ? 'مشاهده ویدیو' : 'مشاهده عکس'}
+                           </button>`;
+            }
+            finalHTML = `<div class="message-bubble p-2 rounded ${isSender ? 'bg-primary text-white' : 'bg-light'}">${content}</div>`;
+        } else {
+            let replySnippetHTML = '';
+            if (message.is_reply && message.parent) {
+                const snippetBg = isSender ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.05)';
+                const parentSenderTextClass = isSender ? '' : 'text-dark';
+                const parentBodyTextClass = isSender ? 'text-white-50' : 'text-muted';
+                replySnippetHTML = `<div class="reply-snippet p-2 rounded mb-1" style="background-color: ${snippetBg};"><strong class="small ${parentSenderTextClass}">${message.parent.sender}</strong><p class="small ${parentBodyTextClass} mb-0">${message.parent.body}</p></div>`;
+            }
+            let fileHTML = '';
+            if (message.file_url) {
+                if (message.is_video) {
+                    fileHTML = `<video src="${message.file_url}" class="img-fluid rounded" controls style="max-height: 250px;"></video>`;
+                } else {
+                    fileHTML = `<img src="${message.file_url}" class="img-fluid rounded" style="max-height: 250px;" />`;
+                }
+            }
+            let postHTML = '';
+            if (message.shared_post) {
+                const textClass = isSender ? 'text-white-50' : 'text-dark';
+                postHTML = `<a href="/post/${message.shared_post.pk}/" class="text-decoration-none"><div class="shared-post-snippet p-2 rounded mb-1 border"><img src="${message.shared_post.media_url}" class="img-fluid rounded mb-2" /><strong class="small d-block ${textClass}">پست از ${message.shared_post.user}</strong></div></a>`;
+            }
+            const messageBodyHTML = message.body ? `<span class="message-body">${message.body.replace(/\n/g, "<br>")}</span>` : '';
+            const bubbleExtraClass = (message.file_url && !message.body) ? 'media-only' : '';
+            const bgClass = isSender ? 'bg-primary text-white' : 'bg-light';
+            finalHTML = `<div class="message-bubble p-2 rounded ${bgClass} ${bubbleExtraClass}">${replySnippetHTML}${postHTML}${fileHTML}${messageBodyHTML}</div>`;
+        }
+        
+        const justifyClass = isSender ? 'justify-content-end' : 'justify-content-start';
+        const replyBtnHTML = `<button class="btn btn-sm reply-message-btn ${isSender ? 'ms-2' : 'me-2'}" data-message-id="${message.id}" data-message-body="${message.body ? (message.body.substring(0,20) || 'فایل') : (message.file_url ? 'فایل' : 'پست')}" data-message-sender="${message.sender}"><i class="bi bi-reply"></i></button>`;
+
+        const messageWrapperHTML = `
+            <div class="message-wrapper d-flex ${justifyClass} mb-2 group-hover" data-message-id="${message.id}">
+                ${!isSender ? replyBtnHTML : ''}
+                ${finalHTML}
+                ${isSender ? replyBtnHTML : ''}
+            </div>
+        `;
+        
+        messageList.insertAdjacentHTML('beforeend', messageWrapperHTML);
+        setupEventListeners();
+    }
+});
+</script>
+{% endblock %}

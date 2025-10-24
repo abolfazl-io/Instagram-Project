@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}حذف اکانت{% endblock %}
+
+{% block content %}
+<div class="card p-4 text-center">
+    <h4 class="mb-3 text-danger">⚠️ هشدار: حذف اکانت</h4>
+    <p>با حذف اکانت تمام اطلاعات و پست‌های شما پاک خواهند شد و قابل بازیابی نیستند.</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">بله، اکانت من را حذف کن</button>
+        <a href="{% url 'shop1:profile' %}" class="btn btn-secondary">انصراف</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="post-card">
+    <div class="post-header p-3">
+        <a href="{% url 'shop1:public_profile' post.user.username %}" class="text-decoration-none text-dark fw-bold d-flex align-items-center">
+            {% if post.user.profile and post.user.profile.image %}
+                <img src="{{ post.user.profile.image.url }}" alt="{{ post.user.username }}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; margin-left: 12px;">
+            {% else %}
+                <i class="bi bi-person-circle fs-2 me-2"></i>
+            {% endif %}
+            <span>{{ post.user.username }}</span>
+        </a>
+    </div>
+
+    {% if post.media.all %}
+    <div id="carousel-{{ post.id }}" class="carousel slide" data-bs-touch="true" data-bs-interval="false">
+        {% if post.media.count > 1 %}
+        <div class="carousel-indicators">
+            {% for media in post.media.all %}
+            <button type="button" data-bs-target="#carousel-{{ post.id }}" data-bs-slide-to="{{ forloop.counter0 }}" class="{% if forloop.first %}active{% endif %}"></button>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="carousel-inner">
+            {% for media in post.media.all %}
+            <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                {% if media.is_video %}
+                    <video class="d-block w-100" controls style="max-height: 600px; object-fit: cover;">
+                        <source src="{{ media.file.url }}" type="video/mp4">
+                    </video>
+                {% else %}
+                    <img src="{{ media.file.url }}" class="d-block w-100" alt="Post media" style="max-height: 600px; object-fit: cover;">
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="post-actions p-2 d-flex align-items-center">
+        <button type="button" class="btn text-dark like-btn" data-post-id="{{ post.pk }}" data-like-url="{% url 'shop1:like_post' post.pk %}">
+            <i class="bi {% if user in post.likes.all %}bi-heart-fill text-danger{% else %}bi-heart{% endif %}"></i>
+        </button>
+        <span class="fw-bold me-2" id="like-count-{{ post.pk }}">{{ post.total_likes }}</span>
+        
+        <a href="#comments" class="btn text-dark"><i class="bi bi-chat"></i></a>
+        <a href="{% url 'shop1:share_post' post.pk %}" class="btn text-dark"><i class="bi bi-send"></i></a>
+    </div>
+
+    <div class="px-3 pb-3">
+        <p class="caption-text">
+            <a href="{% url 'shop1:public_profile' post.user.username %}" class="text-decoration-none text-dark fw-bold">{{ post.user.username }}</a>
+            <span>{{ post.desc|linebreaksbr }}</span>
+        </p>
+        <small class="text-muted">{{ post.publish|date:"Y/m/d" }}</small>
+    </div>
+</div>
+
+<hr>
+
+<div id="comments" class="post-card p-3">
+    <h3>نظرات</h3>
+    
+    {% if user.is_authenticated %}
+    <form action="{% url 'shop1:add_comment' post.pk %}" method="post" class="mt-3">
+        {% csrf_token %}
+        <div class="input-group">
+            <input type="text" name="body" class="form-control" placeholder="نظر خود را بنویسید..." required>
+            <button type="submit" class="btn btn-outline-secondary">ارسال</button>
+        </div>
+    </form>
+    {% else %}
+    <p>برای نظر دادن <a href="{% url 'shop1:login' %}?next={{ request.path }}">وارد شوید</a>.</p>
+    {% endif %}
+
+    <div class="mt-4">
+        {% for comment in comments %}
+            {% if not comment.parent_comment %}
+                {% include '_comment.html' with comment=comment %}
+            {% endif %}
+        {% empty %}
+            <p class="text-muted mt-3">هنوز نظری ثبت نشده است.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // اسکریپت برای دکمه‌های پاسخ در کامنت‌ها
+    document.querySelectorAll('.reply-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const commentId = this.dataset.commentId;
+            const replyForm = document.getElementById(`reply-form-${commentId}`);
+            
+            if (replyForm.style.display === 'none') {
+                replyForm.style.display = 'block';
+            } else {
+                replyForm.style.display = 'none';
+            }
+        });
+    });
+
+    // اسکریپت برای لایک با AJAX
+    document.querySelectorAll('.like-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const postId = this.dataset.postId;
+            const url = this.dataset.likeUrl;
+            const likeIcon = this.querySelector('i');
+            const likeCountSpan = document.getElementById(`like-count-${postId}`);
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                likeCountSpan.textContent = data.total_likes;
+                if (data.user_liked) {
+                    likeIcon.classList.remove('bi-heart');
+                    likeIcon.classList.add('bi-heart-fill', 'text-danger');
+                } else {
+                    likeIcon.classList.remove('bi-heart-fill', 'text-danger');
+                    likeIcon.classList.add('bi-heart');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    });
+});
+</script>
+{% endblock page_scripts %}

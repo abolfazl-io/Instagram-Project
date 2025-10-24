@@ -1,0 +1,151 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}اینستاگرام من{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
+    <style>
+        /* CSS Variables for Theming */
+        :root {
+            --bs-body-bg: #fafafa;
+            --primary-text-color: #262626;
+            --secondary-text-color: #8e8e8e;
+            --border-color: #dbdbdb;
+            --card-bg-color: #ffffff;
+            --navbar-bg-color: #ffffff;
+        }
+        .dark-mode {
+            --bs-body-bg: #121212;
+            --primary-text-color: #e0e0e0;
+            --secondary-text-color: #a0a0a0;
+            --border-color: #363636;
+            --card-bg-color: #1e1e1e;
+            --navbar-bg-color: #1e1e1e;
+        }
+        /* General Styles */
+        body {
+            background-color: var(--bs-body-bg);
+            color: var(--primary-text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .navbar {
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--navbar-bg-color) !important;
+        }
+        .dark-mode .navbar-brand img { filter: invert(1); }
+        .form-control {
+            background-color: var(--bs-body-bg) !important;
+            color: var(--primary-text-color) !important;
+            border-color: var(--border-color) !important;
+        }
+        .form-control::placeholder { color: var(--secondary-text-color); }
+        .text-dark { color: var(--primary-text-color) !important; }
+        .text-muted { color: var(--secondary-text-color) !important; }
+        /* Instagram Look */
+        .story-ring {
+            padding: 2px; border-radius: 50%;
+            background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
+        }
+        .story-thumbnail { width: 60px; height: 60px; border-radius: 50%; border: 2px solid var(--card-bg-color); object-fit: cover;}
+        .post-card { border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 24px; background-color: var(--card-bg-color); }
+        .post-header img { width: 32px; height: 32px; border-radius: 50%; margin-left: 12px; object-fit: cover;}
+        .carousel-item img, .carousel-item video { max-height: 600px; object-fit: cover; }
+        
+        /* Carousel Indicators Style */
+        .carousel-indicators [data-bs-target] {
+            background-color: #a8a8a8;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+        .carousel-indicators .active {
+            background-color: #0095f6;
+        }
+
+        .caption-content {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+        }
+        .caption-text {
+    word-wrap: break-word; /* برای شکستن کلمات طولانی */
+    overflow-wrap: break-word;
+    white-space: pre-wrap; /* برای حفظ فاصله‌ها و خطوط جدید */
+    
+}
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-light sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'shop1:home' %}">
+                <img src="https://www.instagram.com/static/images/web/mobile_nav_type_logo.png/735145cfe0a4.png" alt="Instagram">
+            </a>
+            <form class="d-flex" action="{% url 'shop1:search_users' %}" method="get">
+                <input class="form-control me-2" type="search" name="q" placeholder="جستجو...">
+            </form>
+            <div class="d-flex align-items-center">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'shop1:home' %}" class="btn fs-4 text-dark"><i class="bi bi-house-door"></i></a>
+                    <a href="{% url 'shop1:create_post' %}" class="btn fs-4 text-dark"><i class="bi bi-plus-square"></i></a>
+                    <a href="{% url 'shop1:profile' %}" class="btn fs-4 text-dark"><i class="bi bi-person-circle"></i></a>
+                    <a href="{% url 'shop1:logout' %}" class="btn fs-4 text-dark"><i class="bi bi-box-arrow-right"></i></a>
+                    <a href="{% url 'shop1:home' %}" class="btn fs-4 text-dark"><i class="bi bi-house-door"></i></a>
+                    <a href="{% url 'shop1:inbox' %}" class="btn fs-4 text-dark"><i class="bi bi-send"></i></a>
+                    <a href="{% url 'shop1:explore' %}" class="btn fs-4 text-dark"><i class="bi bi-compass"></i></a>
+                    <a href="{% url 'shop1:create_post' %}" class="btn fs-4 text-dark"><i class="bi bi-plus-square"></i></a>
+                {% else %}
+                    <a href="{% url 'shop1:login' %}" class="btn btn-primary">ورود</a>
+                {% endif %}
+                <button id="theme-toggle" class="btn fs-4 text-dark ms-2"><i class="bi bi-moon-stars-fill"></i></button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container my-4" style="max-width: 600px;">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const themeToggle = document.getElementById('theme-toggle');
+            if (themeToggle) {
+                const toggleIcon = themeToggle.querySelector('i');
+                
+                const applyTheme = (theme) => {
+                    if (theme === 'dark') {
+                        document.body.classList.add('dark-mode');
+                        toggleIcon.classList.replace('bi-moon-stars-fill', 'bi-sun-fill');
+                    } else {
+                        document.body.classList.remove('dark-mode');
+                        toggleIcon.classList.replace('bi-sun-fill', 'bi-moon-stars-fill');
+                    }
+                };
+
+                const savedTheme = localStorage.getItem('theme') || 'light';
+                applyTheme(savedTheme);
+
+                themeToggle.addEventListener('click', () => {
+                    let newTheme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
+                    localStorage.setItem('theme', newTheme);
+                    applyTheme(newTheme);
+                });
+            }
+        });
+
+        function copyToClipboard(text) {
+          navigator.clipboard.writeText(text).then(() => alert('لینک پست کپی شد!'))
+            .catch(err => console.error('Error copying text: ', err));
+        }
+    </script>
+    {% block page_scripts %}{% endblock %}
+</body>
+</html>
